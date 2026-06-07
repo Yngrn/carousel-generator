@@ -18,7 +18,10 @@ def generate():
         tmp_path = f.name
     
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(
+            executable_path='/usr/bin/chromium',
+            args=['--no-sandbox', '--disable-setuid-sandbox']
+        )
         page = browser.new_page(viewport={"width": 1080, "height": 1350})
         page.goto(f"file://{tmp_path}")
         page.wait_for_load_state("networkidle")
@@ -30,6 +33,10 @@ def generate():
     
     os.unlink(tmp_path)
     return jsonify({"slides": slides_b64})
+
+@app.route('/', methods=['GET'])
+def health():
+    return "OK"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
