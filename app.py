@@ -1,38 +1,26 @@
 from flask import Flask, request, jsonify
-from playwright.sync_api import sync_playwright
 import base64
 import os
-import tempfile
+import requests
 
 app = Flask(__name__)
+
+HCTI_API_USER_ID = os.environ.get('HCTI_USER_ID')
+HCTI_API_KEY = os.environ.get('HCTI_API_KEY')
 
 @app.route('/generate', methods=['POST'])
 def generate():
     data = request.json
     html_content = data.get('html')
     
-    slides_b64 = []
+    response = requests.post(
+        'https://hcti.io/v1/image',
+        auth=(HCTI_API_USER_ID, HCTI_API_KEY),
+        json={'html': html_content}
+    )
     
-    with tempfile.NamedTemporaryFile(suffix='.html', delete=False, mode='w') as f:
-        f.write(html_content)
-        tmp_path = f.name
-    
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path='/usr/bin/chromium',
-            args=['--no-sandbox', '--disable-setuid-sandbox']
-        )
-        page = browser.new_page(viewport={"width": 1080, "height": 1350})
-        page.goto(f"file://{tmp_path}")
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
-        for slide in page.query_selector_all(".slide"):
-            png = slide.screenshot()
-            slides_b64.append(base64.b64encode(png).decode())
-        browser.close()
-    
-    os.unlink(tmp_path)
-    return jsonify({"slides": slides_b64})
+    result = response.json()
+    return jsonify({"image_url": result.get('url')})
 
 @app.route('/', methods=['GET'])
 def health():
